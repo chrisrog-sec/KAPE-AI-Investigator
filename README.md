@@ -1,32 +1,50 @@
-# KAPE checkpoint recovery helper
+## Recovering interrupted ingestion
 
-This helper reconstructs `reports/events_normalized.json` from completed per-file checkpoints, without editing source evidence or checkpoint files.
+If an ingestion run was interrupted, `recover_checkpoints.py` can rebuild `reports/events_normalized.json` using completed, valid per-file checkpoints. This avoids reprocessing every evidence file unnecessarily.
 
-## Run from your project root
+### Prerequisites
 
-First close the investigator and ingestion process. Keep a copy of the project folder if practical. Then run:
+- Python installed and the project's dependencies available.
+- The original KAPE evidence output still available.
+- Existing checkpoint files in `reports/.ingestion_checkpoints/`.
+- The project scripts and directory structure intact.
+
+### Run the recovery helper
+
+From the project root, activate your virtual environment if you use one:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Then run:
 
 ```powershell
 python .\recover_checkpoints.py --source "E:\KAPE-Output-2" --checkpoints ".\reports\.ingestion_checkpoints" --output ".\reports\events_normalized.json"
 ```
 
-The helper:
-- checks each checkpoint's source file exists under the chosen evidence root;
-- hashes each source file and includes a checkpoint only when its SHA-256 matches;
-- verifies each record's source path and hash provenance;
-- keeps the schema expected by the current ingestion/investigator code;
-- makes a timestamped backup of an existing output before replacing it;
-- never changes source evidence or checkpoint files;
-- reports skipped checkpoints and records.
+Replace `E:\KAPE-Output-2` with the path to your own evidence directory.
 
-If it reports zero valid checkpoints, it does not change the output. Do not delete or move your existing checkpoints.
+### What happens?
 
-## Test
+The helper checks source-file existence and SHA-256 hashes, validates checkpoint provenance, and reconstructs the normalized event file from eligible checkpoints. If an output already exists, it creates a timestamped backup before replacing it.
 
-Copy the helper and `test_recover_checkpoints.py` into the project root, then run:
+- **Valid checkpoints found:** eligible records are recovered into the normalized output.
+- **Some checkpoints rejected:** the helper reports skipped checkpoints and records.
+- **No valid checkpoints found:** the existing output is left unchanged.
+
+The helper does not modify the original evidence or checkpoint files. Close any running ingestion or investigation processes before recovery, and keep a backup of your project where practical.
+
+### Run the tests
+
+From the project root:
 
 ```powershell
 python -m unittest .\test_recover_checkpoints.py -v
 ```
 
-Tests use synthetic temporary evidence and make no API calls.
+The tests use synthetic temporary evidence and do not make API calls.
+
+### Important limitations
+
+Recovery depends on the checkpoint format and schema expected by the current project code. A matching source hash helps verify provenance, but does not independently establish that the evidence or checkpoint contents are trustworthy.
